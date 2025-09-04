@@ -36,9 +36,18 @@ from starvector.model.builder import model_builder
 from safetensors.torch import load_file as load_safetensors
 from starvector.util import get_config
 import torch
-
+from dotenv import load_dotenv
 from starvector.train.util import load_checkpoint, is_deepspeed, consolidate_deepspeed_checkpoint
 logger = get_logger(__name__, log_level="INFO")
+
+load_dotenv(dotenv_path=os.path.join("..", ".env"))
+print("--------------------------------")
+print(f"HF_HOME: {os.getenv('HF_HOME')}")
+print(f"HF_TOKEN: {os.getenv('HF_TOKEN')}")
+print(f"WANDB_API_KEY: {os.getenv('WANDB_API_KEY')}")
+print(f"OUTPUT_DIR: {os.getenv('OUTPUT_DIR')}")
+print("--------------------------------\n\n")
+
 
 def validate(model, dataloader, accelerator):
     loss_meter = AverageMeter()

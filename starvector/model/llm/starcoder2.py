@@ -22,7 +22,7 @@ class StarCoderModel(nn.Module):
         model = AutoModelForCausalLM.from_pretrained(
             config.starcoder_model_name, 
             config=model_config, 
-            attn_implementation="flash_attention_2", 
+            # attn_implementation="flash_attention_2", 
             torch_dtype=torch.bfloat16, 
             trust_remote_code=True)
         model.resize_token_embeddings(len(self.tokenizer))

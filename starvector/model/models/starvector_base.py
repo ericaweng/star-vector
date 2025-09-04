@@ -5,6 +5,8 @@ from starvector.model.adapters.adapter import Adapter
 from starvector.model.image_encoder.image_encoder import ImageEncoder
 from starvector.util import print_trainable_parameters
 from transformers.generation.stopping_criteria import StoppingCriteria, StoppingCriteriaList
+from PIL import Image
+import torchvision.transforms as transforms
 
 class StoppingCriteriaSub(StoppingCriteria):
 
@@ -19,15 +21,22 @@ class StoppingCriteriaSub(StoppingCriteria):
                 return True
         return False
 
+
+_precision_map = {	
+    "fp32": torch.float32, "float32": torch.float32,
+    "fp16": torch.float16, "float16": torch.float16,
+    "bf16": torch.bfloat16, "bfloat16": torch.bfloat16,
+}
+
+
 class StarVectorBase(nn.Module, ABC):
     def __init__(self, config, **kwargs):
         super().__init__()
         # Task-specific layers
         self.task = kwargs.get('task', 'im2svg')
-        self.model_precision = kwargs.get('model_precision', config.torch_dtype)
+        self.model_precision = _precision_map.get(kwargs.get('model_precision', config.torch_dtype), kwargs.get('model_precision', config.torch_dtype))
         # Build Code LLM (StarCoder)
         self.svg_transformer = self._get_svg_transformer(config, **kwargs)
-        
         if self.use_image_encoder():
             # Build Image Encoder
             self.image_encoder = ImageEncoder(config, **kwargs)
@@ -204,7 +213,18 @@ class StarVectorBase(nn.Module, ABC):
         """Common preparation for generation inputs"""
         image = batch["image"]
         image = image.to(device).to(self.model_precision)
-        
+        # print(f"{image.shape=}")
+        # print(f"{self.image_encoder=}")
+        # resize image to 384x384 using torch's interpolate
+        if image.shape[-2:] != (384, 384):
+            image = torch.nn.functional.interpolate(
+                image, 
+                size=(384, 384), 
+                mode='bilinear', 
+                align_corners=False
+            )
+        # print(f"{image.shape=}")
+
         embedded_image = self.image_encoder(image)
         embedded_image = self.image_projection(embedded_image)
         embedded_att = torch.ones(embedded_image.size()[:-1], dtype=torch.long).to(device)
@@ -218,6 +238,7 @@ class StarVectorBase(nn.Module, ABC):
         inputs_embeds = self._get_embeddings(prompt_tokens.input_ids)
         inputs_embeds = torch.cat([embedded_image, inputs_embeds], dim=1)
         
+        # print(f"{inputs_embeds=}")
         return inputs_embeds, attention_mask, prompt_tokens
 
     def _get_generation_kwargs(self, base_kwargs):
@@ -296,7 +317,8 @@ class StarVectorBase(nn.Module, ABC):
 
     def generate_text2svg(self, batch, **kwargs):
         """Base implementation of text to SVG generation"""
-        device = batch["image"].device
+        # device = batch["image"].device
+        device = batch["caption"].device
         prompt = batch["caption"]
         
         prompt_tokens = self._tokenize(
@@ -305,14 +327,16 @@ class StarVectorBase(nn.Module, ABC):
             device=device,
             add_special_tokens=False
         )
-        
+        print("prompt_tokens", prompt_tokens)
+
         trigger_token = self._tokenize(
             [self.svg_transformer.svg_start_token for _ in batch["caption"]],
             max_length=None,
             device=device,
             add_special_tokens=False
         )
-        
+        print("trigger_token", trigger_token)
+
         input_tokens = torch.cat([prompt_tokens.input_ids, trigger_token.input_ids], dim=1)
         attention_mask = torch.cat([prompt_tokens.attention_mask, trigger_token.attention_mask], dim=1)
         inputs_embeds = self._get_embeddings(input_tokens)
@@ -320,7 +344,7 @@ class StarVectorBase(nn.Module, ABC):
 
         generation_kwargs = self._get_generation_kwargs(
             {**kwargs, 'inputs_embeds': inputs_embeds, 'attention_mask': attention_mask},
-            input_tokens.size(1)
+            # input_tokens.size(1)
         )
         # Let subclasses override these defaults if needed
         generation_kwargs.update(self._get_text2svg_specific_kwargs(kwargs))

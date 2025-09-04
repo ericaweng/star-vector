@@ -335,7 +335,7 @@ def build_demo(embed_mode):
                 image_process_mode = gr.Radio(
                     ["Resize", "Pad", "Default"],
                     value="Pad",
-                    label="Preprocess for non-square image", visible=False)
+                    label="Preprocess for non-square image", visible=True)
                 
                 # Text input
                 text_caption = gr.Textbox(label="Text Caption", visible=True, value="The icon of a yellow star", elem_id="text_caption")

@@ -49,12 +49,18 @@ class Conversation:
                                 result.paste(pil_img, ((height - width) // 2, 0))
                                 return result
                         image = expand2square(image)
+                        image = image.resize((384, 384))
                     elif image_process_mode in ["Default", "Crop"]:
                         pass
                     elif image_process_mode == "Resize":
-                        image = image.resize((224, 224))
+                        image = image.resize((384, 384))
                     else:
                         raise ValueError(f"Invalid image_process_mode: {image_process_mode}")
+                    
+                    # Always resize to 384x384 after any preprocessing
+                    # print(f"{image.shape=}")
+                    image = image.resize((384, 384))
+                    # print(f"{image.shape=}")
                     max_hw, min_hw = max(image.size), min(image.size)
                     aspect_ratio = max_hw / min_hw
                     max_len, min_len = 800, 400
@@ -141,17 +147,8 @@ class Conversation:
                     import base64
                     from io import BytesIO
                     image, image_process_mode = msg
-                    max_hw, min_hw = max(image.size), min(image.size)
-                    aspect_ratio = max_hw / min_hw
-                    max_len, min_len = 800, 400
-                    shortest_edge = int(min(max_len / aspect_ratio, min_len, min_hw))
-                    longest_edge = int(shortest_edge * aspect_ratio)
-                    W, H = image.size
-                    if H > W:
-                        H, W = longest_edge, shortest_edge
-                    else:
-                        H, W = shortest_edge, longest_edge
-                    image = image.resize((W, H))
+                    # Always resize to 384x384 for display
+                    image = image.resize((384, 384))
                     buffered = BytesIO()
                     image.save(buffered, format="JPEG")
                     img_b64_str = base64.b64encode(buffered.getvalue()).decode()
